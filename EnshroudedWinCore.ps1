@@ -91,7 +91,7 @@ if (-not (CommandExists 'choco')) {
 if (-not (CommandExists 'git')) {
     # Git is not installed, so install it using Chocolatey
     Write-Host "Git is not installed. Installing Git..."
-    choco install git -y
+    scoop install git
 
     # Check if Git installation was successful
     if (CommandExists 'git') {
@@ -147,7 +147,7 @@ if (-not (CommandExists 'nano')) {
 if (-not (CommandExists 'steamcmd')) {
     # SteamCMD is not installed, so install it using Scoop
     Write-Host "SteamCMD is not installed. Installing SteamCMD..."
-    scoop install steam
+    scoop install steamcmd
 
     # Check if SteamCMD installation was successful
     if (CommandExists 'steamcmd') {
@@ -178,18 +178,44 @@ if (!(Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyCon
     Write-Output "Firewall rule 'OpenSSH-Server-In-TCP' has been created and exists."
 }
 
-# Prompt the user for an install path
-$installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
+# Function to prompt user for install path
+function PromptForInstallPath {
+    $installPath = Read-Host -Prompt "Enter the installation directory where you would like to install the dedicated server"
 
-# Validate and ensure the path is not empty
-while (-not (Test-Path $installPath -PathType Container) -or -not $installPath) {
-    Write-Host "Invalid path. Please enter a valid installation path."
-    $installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
+    # Validate and ensure the path is not empty
+    while (-not $installPath -or -not (Test-Path $installPath -IsValid)) {
+        Write-Host "Invalid directory or directory does not exist."
+        $createPathChoice = Read-Host -Prompt "Do you want to create the directory? (Y/N)"
+        
+        if ($createPathChoice -eq 'Y' -or $createPathChoice -eq 'y') {
+            # Attempt to create the path
+            try {
+                New-Item -Path $installPath -ItemType Directory -Force
+                Write-Host "Directory created successfully."
+            } catch {
+                Write-Host "Error creating path. Please enter a valid installation path."
+                $installPath = Read-Host -Prompt "Enter the installation path where you would like to install the dedicated server"
+            }
+        } else {
+            # User does not want to create the path, prompt again for install path
+            $installPath = Read-Host -Prompt "Enter the installation directory where you would like to install the dedicated server"
+        }
+    }
+
+    return $installPath
 }
-Write-Host "Success! Installing to $installPath"
+
+# Prompt user for install path
+$chosenPath = PromptForInstallPath
+
+# Use the $chosenPath variable later in your script
+Write-Host "Success! Installing to $chosenPath"
+
+# Continue with your script...
+
 
 # Install Enshrouded dedicated server 
-steamcmd +force_install_dir $installPath +login anonymous +app_update 2278520 validate +quit
+steamcmd +force_install_dir $chosenPath +login anonymous +app_update 2278520 validate +quit
 
 # Create the Enshrouded config file and write the contents of the file
 # Prompt the user for server name
@@ -245,7 +271,7 @@ $jsonObject = @{
 $jsonString = $jsonObject | ConvertTo-Json
 
 # Set the file path
-$filePath = "$installPath\enshrouded_server.json"
+$filePath = "$chosenPath\enshrouded_server.json"
 
 # Save the JSON string to the file
 $jsonString | Set-Content -Path $filePath
@@ -271,7 +297,7 @@ CheckAndCreateFirewallRule $queryPort "UDP" "EnshroudedQueryPort"
 # Create a shortcut link to the Enshrouded server application in the home directory. This will allow you to run the server at logon by typing '.\enserver.lnk' 
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$Home\enserver.lnk")
-$Shortcut.TargetPath = "$installPath\enshrouded_server.exe"
+$Shortcut.TargetPath = "$chosenPath\enshrouded_server.exe"
 $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.

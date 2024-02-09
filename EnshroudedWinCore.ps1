@@ -1,6 +1,22 @@
 # Enshrouded Dedicated Server installation script for Windows Server Core
 # Written by TripodGG
 
+# Check the version of Windows Server and add the correct Windows desktop application compatibility files
+$osVersion = (Get-CimInstance Win32_OperatingSystem).Version
+
+# Check if the OS is Windows Server 2016/2019
+if ($osVersion -match '10\.0\.(14393|17763)') {
+    Write-Host "Windows Server 2016/2019 detected."
+}
+# Check if the OS Windows Server 2022
+elseif ($osVersion -match '10\.0\.(20348)') {
+    Write-Host "Windows Server 2022 detected."
+}
+else {
+    Write-Host "Unsupported Windows Server version. Please use a supported version of Windows Server."
+	exit
+}
+
 # Check if NuGet is installed
 if (-not (Get-Module -ListAvailable -Name NuGet)) {
     # NuGet is not installed, so install it silently
@@ -26,19 +42,18 @@ $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
 
 # Check if the OS is Windows Server 2016/2019
 if ($osVersion -match '10\.0\.(14393|17763)') {
-    Write-Host "Windows Server 2016/2019 detected."
+    Write-Host "Installing App Compatibility Tools for Windows Server 2016/2019."
     # Run the command for Server 2016 or 2019
     Add-WindowsCapability -Online -Name ServerCore.AppCompatibility
 }
 # Check if the OS Windows Server 2022
 elseif ($osVersion -match '10\.0\.(20348)') {
-    Write-Host "Windows Server 2022 detected."
+    Write-Host "Installing App Compatibility Tools for Windows Server 2022."
     # Run the command for Server 2022
     Add-WindowsCapability -Online -Name ServerCore.AppCompatibility~~~~0.0.1.0
 }
 else {
-    Write-Host "Unsupported Windows Server version. Please use a supported version of Windows Server."
-	exit
+    Write-Host "Continuing with installation..."
 }
 
 # Check to see if apps are already installed and install them if they are not

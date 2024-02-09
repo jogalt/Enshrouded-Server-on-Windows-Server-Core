@@ -44,6 +44,7 @@ elseif ($osVersion -match '10\.0\.(20348)') {
 }
 else {
     Write-Host "Unsupported Windows Server version."
+	exit
 }
 
 # Install the OpenSSH Server

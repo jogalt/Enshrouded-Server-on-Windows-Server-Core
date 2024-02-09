@@ -3,7 +3,7 @@
 
 # Make sure all Windows updates have been applied - This can be done from sconfig under option 6
 Install-Module -Name PSWindowsUpdate -Force
-Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
+Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -IgnoreReboot
 
 # Set the execution policy
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -71,42 +71,81 @@ mkdir "c:\Enshrouded\"
 steamcmd +force_install_dir c:\Enshrouded\ +login anonymous +app_update 2278520 validate +quit
 
 # Create the Enshrouded config file and write the contents of the file
-New-Item c:\Enshrouded\enshrouded_server.json
-Set-Content c:\Enshrouded\enshrouded_server.json '{
+# Prompt the user for server name
+$serverName = Read-Host -Prompt "Enter the name you would like to use for your game server:"
 
-    "name": "ENSHROUDED_SERVER_NAME",
+# Prompt the user for server password
+$serverPassword = Read-Host -Prompt "Enter the password you would like to use for your game server:"
 
-    "password": "ENSHROUDED_SERVER_PASSWORD",
-
-    "saveDirectory": "./savegame",
-
-    "logDirectory": "./logs",
-
-    "ip": "0.0.0.0",
-
-    "gamePort": 15636,
-
-    "queryPort": 15637,
-
-    "slotCount": ENSHROUDED_SERVER_MAXPLAYERS
-
-}'
-
-# Create firewall rules to allow external access to the Enshrouded server
-if (!(Get-NetFirewallRule -Name "Enshrouded-TCP" -ErrorAction SilentlyContinue | Select-Object Name, Enabled)) {
-    Write-Output "Firewall Rule 'Enshrouded-TCP' does not exist, creating it..."
-    New-NetFirewallRule -Name 'Enshrouded-TCP' -DisplayName 'Enshrouded-TCP' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 15636-15637
-} else {
-    Write-Output "Firewall rule 'Enshrouded-TCP' has been created and exists."
+# Prompt the user for the game port with default value 15636
+$defaultGamePort = 15636
+$gamePort = Read-Host -Prompt "Enter the game port to be used (press enter to use default port: $defaultGamePort)"
+if (-not $gamePort) {
+    $gamePort = $defaultGamePort
 }
 
-
-if (!(Get-NetFirewallRule -Name "Enshrouded-UDP" -ErrorAction SilentlyContinue | Select-Object Name, Enabled)) {
-    Write-Output "Firewall Rule 'Enshrouded-UDP' does not exist, creating it..."
-    New-NetFirewallRule -Name 'Enshrouded-UDP' -DisplayName 'Enshrouded-UDP' -Enabled True -Direction Inbound -Protocol UDP -Action Allow -LocalPort 15636-15637
-} else {
-    Write-Output "Firewall rule 'Enshrouded-UDP' has been created and exists."
+# Prompt the user for the query port with default value 15637
+$defaultQueryPort = 15637
+$queryPort = Read-Host -Prompt "Enter the query port to be used (press enter to use default port: $defaultQueryPort)"
+if (-not $queryPort) {
+    $queryPort = $defaultQueryPort
 }
+
+# Ensure that the query port is not more than 1 higher than the game port
+while ($queryPort -gt ($gamePort + 1)) {
+    Write-Host "Error: The query cannot be more than one port number higher than the game port."
+    $gamePort = Read-Host -Prompt "Enter the game port (press enter to use default port: $defaultGamePort)"
+    if (-not $gamePort) {
+        $gamePort = $defaultGamePort
+    }
+    $queryPort = Read-Host -Prompt "Enter the query port (press enter to use default port: $defaultQueryPort)"
+    if (-not $queryPort) {
+        $queryPort = $defaultQueryPort
+    }
+}
+
+# Prompt the user for the number of players allowed (with a maximum of 16)
+$maxPlayers = Read-Host -Prompt "Enter the maximum number of players (up to 16):"
+$maxPlayers = [math]::Min(16, [math]::Max(1, [int]$maxPlayers)) # Ensure the value is between 1 and 16
+
+# Define the JSON object
+$jsonObject = @{
+    "name"          = $serverName
+    "password"      = $serverPassword
+    "saveDirectory" = "./savegame"
+    "logDirectory"  = "./logs"
+    "ip"            = "0.0.0.0"
+    "gamePort"      = $gamePort
+    "queryPort"     = $queryPort
+    "slotCount"     = $maxPlayers
+}
+
+# Convert the JSON object to a JSON string
+$jsonString = $jsonObject | ConvertTo-Json
+
+# Set the file path
+$filePath = "C:\enshrouded\enshrouded_server.json"
+
+# Save the JSON string to the file
+$jsonString | Set-Content -Path $filePath
+
+Write-Host "Configuration saved to $filePath"
+
+# Function to check and create firewall rules
+function CheckAndCreateFirewallRule($port, $protocol, $ruleName) {
+    $existingRule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+
+    if (-not $existingRule) {
+        New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol $protocol -LocalPort $port
+        Write-Host "Firewall rule for $protocol port $port created."
+    } else {
+        Write-Host "Firewall rule for $protocol port $port already exists. Skipping creation."
+    }
+}
+
+# Check and create firewall rules
+CheckAndCreateFirewallRule $gamePort "TCP" "EnshroudedGamePort"
+CheckAndCreateFirewallRule $queryPort "UDP" "EnshroudedQueryPort"
 
 # Create a shortcut link to the Enshrouded server application in the home directory. This will allow you to run the server at logon by typing '.\enserver.lnk' 
 $WshShell = New-Object -comObject WScript.Shell
@@ -116,3 +155,18 @@ $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.
 Write-Output "Enshrouded dedicated server has successfully been installed. Use '.\enserver.lnk' to start the game server app."
+
+# Check if there are pending reboots due to Windows updates
+$pendingReboots = Get-PendingReboot
+if ($pendingReboots.Count -gt 0) {
+    # Prompt the user to reboot if there are pending reboots
+    $rebootChoice = Read-Host -Prompt "There are pending reboots due to Windows updates. Do you want to reboot now? (Y/N)"
+    if ($rebootChoice -eq 'Y' -or $rebootChoice -eq 'y') {
+        Write-Host "Rebooting the server..."
+        Restart-Computer -Force
+    } else {
+        Write-Host "Please remember to reboot the server later to apply the updates."
+    }
+} else {
+    Write-Host "No pending reboots. The server is up to date."
+}

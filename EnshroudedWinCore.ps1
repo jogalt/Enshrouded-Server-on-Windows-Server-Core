@@ -35,7 +35,33 @@ Import-Module PSWindowsUpdate
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # Check for and install updates
-Get-WindowsUpdate -Install -AcceptAll -IgnoreReboot
+Get-WindowsUpdate -Install -AcceptAll
+
+# Function to check if a reboot is pending due to updates
+function Check-And-RebootIfNeeded {
+    $pendingReboot = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired' -ErrorAction SilentlyContinue).RebootRequired
+
+    if ($pendingReboot) {
+        # Reboot is required, prompt the user and proceed with reboot if agreed
+        $rebootChoice = Read-Host -Prompt "A reboot is required to install updates. Would you like to reboot now? (Y/N)"
+
+        if ($rebootChoice -eq 'Y' -or $rebootChoice -eq 'y') {
+            Write-Host "Rebooting the machine. Please run the script again after the server reboot."
+            Restart-Computer -Force
+        } else {
+            Write-Host "You chose not to reboot. The script will now exit. Please manually reboot the server and run the script again."
+            return $false
+        }
+    } else {
+        # No reboot is required
+        Write-Host "No reboot is required at the moment."
+    }
+
+    return $true
+}
+
+# Check and reboot if needed
+$rebootCompleted = Check-And-RebootIfNeeded
 
 # Check the version of Windows Server and add the correct Windows desktop application compatibility files
 $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
@@ -176,26 +202,9 @@ if (-not (CommandExists 'steamcmd')) {
     Write-Host "SteamCMD is already installed. Skipping installation."
 }
 
-# Install the OpenSSH Server (convenient for copying files)
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-
-# Start the sshd service
-Start-Service sshd
-
-# Set the SSH service to automatic startup
-Set-Service -Name sshd -StartupType 'Automatic'
-
-# Create a firewall rule allowing SSH access
-if (!(Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue | Select-Object Name, Enabled)) {
-    Write-Output "Firewall Rule 'OpenSSH-Server-In-TCP' does not exist, creating it..."
-    New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
-} else {
-    Write-Output "Firewall rule 'OpenSSH-Server-In-TCP' has been created and exists."
-}
-
 # Function to prompt user for install path
 function PromptForInstallPath {
-    $installPath = Read-Host -Prompt "Enter the installation directory where you would like to install the dedicated server"
+    $installPath = Read-Host -Prompt "Enter the directory where you would like to install the dedicated server"
 
     # Validate and ensure the path is not empty
     while (-not $installPath -or -not (Test-Path $installPath -IsValid)) {
@@ -209,11 +218,11 @@ function PromptForInstallPath {
                 Write-Host "Directory created successfully."
             } catch {
                 Write-Host "Error creating path. Please enter a valid installation path."
-                $installPath = Read-Host -Prompt "Enter the installation path where you would like to install the dedicated server"
+                $installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
             }
         } else {
             # User does not want to create the path, prompt again for install path
-            $installPath = Read-Host -Prompt "Enter the installation directory where you would like to install the dedicated server"
+            $installPath = Read-Host -Prompt "Enter the directory where you would like to install the dedicated server"
         }
     }
 
@@ -231,6 +240,11 @@ Write-Host "Success! Installing to $chosenPath"
 
 # Install Enshrouded dedicated server 
 steamcmd +force_install_dir $chosenPath +login anonymous +app_update 2278520 validate +quit
+
+# Install Visual C++ 2022 Redistributable
+cd $chosenPath\_CommonRedist\vcredist\2022\
+vc_redist.x64.exe
+cd ~
 
 # Create the Enshrouded config file and write the contents of the file
 # Prompt the user for server name
@@ -317,18 +331,3 @@ $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.
 Write-Output "Enshrouded dedicated server has successfully been installed. Use '.\enserver.lnk' to start the game server app."
-
-# Check if there are pending reboots due to Windows updates
-$pendingReboots = Get-PendingReboot
-if ($pendingReboots.Count -gt 0) {
-    # Prompt the user to reboot if there are pending reboots
-    $rebootChoice = Read-Host -Prompt "There are pending reboots due to Windows updates. Do you want to reboot now? (Y/N)"
-    if ($rebootChoice -eq 'Y' -or $rebootChoice -eq 'y') {
-        Write-Host "Rebooting the server..."
-        Restart-Computer -Force
-    } else {
-        Write-Host "Please remember to reboot the server later to apply the updates."
-    }
-} else {
-    Write-Host "No pending reboots. The server is up to date."
-}

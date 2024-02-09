@@ -8,6 +8,19 @@ if (-not (Get-Module -ListAvailable -Name NuGet)) {
     Install-Module -Name NuGet -Force -Scope CurrentUser -Confirm:$false
 }
 
+# Make sure all Windows updates have been applied - This can also be done from sconfig under option 6
+# Install the PSWindowsUpdate module
+Install-Module -Name PSWindowsUpdate -Force
+
+# Import the module
+Import-Module PSWindowsUpdate
+
+# Set the execution policy
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Check for and install updates
+Get-WindowsUpdate -Install -AcceptAll -IgnoreReboot
+
 # Check the version of Windows Server and add the correct Windows desktop application compatibility files
 $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
 
@@ -27,19 +40,6 @@ else {
     Write-Host "Unsupported Windows Server version. Please use a supported version of Windows Server."
 	exit
 }
-
-# Make sure all Windows updates have been applied - This can also be done from sconfig under option 6
-# Install the PSWindowsUpdate module
-Install-Module -Name PSWindowsUpdate -Force
-
-# Import the module
-Import-Module PSWindowsUpdate
-
-# Set the execution policy
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Check for and install updates
-Get-WindowsUpdate -Install -AcceptAll -IgnoreReboot
 
 # Check to see if apps are already installed and install them if they are not
 # Function to check if a command is available

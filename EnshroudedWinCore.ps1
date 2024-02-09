@@ -1,6 +1,13 @@
 # Enshrouded Dedicated Server installation script for Windows Server Core
 # Written by TripodGG
 
+# Check if NuGet is installed
+if (-not (Get-Module -ListAvailable -Name NuGet)) {
+    # NuGet is not installed, so install it silently
+    Install-PackageProvider -Name NuGet -Force -ForceBootstrap -Scope CurrentUser -Confirm:$false
+    Install-Module -Name NuGet -Force -Scope CurrentUser -Confirm:$false
+}
+
 # Check the version of Windows Server and add the correct Windows desktop application compatibility files
 $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
 

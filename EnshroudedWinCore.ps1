@@ -1,32 +1,6 @@
 # Enshrouded Dedicated Server installation script for Windows Server Core
 # Written by TripodGG
 
-# Make sure all Windows updates have been applied - This can be done from sconfig under option 6
-Install-Module -Name PSWindowsUpdate -Force
-Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -IgnoreReboot
-
-# Set the execution policy
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Install Chocolatey
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# Install Scoop
-iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
-
-# Install git
-scoop install git
-
-# Install Scoop extras bucket
-scoop bucket add extras
-
-# Add Nano for Windows bucket
-scoop bucket add .oki https://github.com/okibcn/Bucket
-
-# Install Nano text editor and SteamCMD
-scoop install nano
-scoop install steamcmd
-
 # Check the version of Windows Server and add the correct Windows desktop application compatibility files
 $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
 
@@ -43,11 +17,144 @@ elseif ($osVersion -match '10\.0\.(20348)') {
     Add-WindowsCapability -Online -Name ServerCore.AppCompatibility~~~~0.0.1.0
 }
 else {
-    Write-Host "Unsupported Windows Server version."
+    Write-Host "Unsupported Windows Server version. Please use a supported version of Windows Server."
 	exit
 }
 
-# Install the OpenSSH Server
+# Make sure all Windows updates have been applied - This can also be done from sconfig under option 6
+# Install the PSWindowsUpdate module
+Install-Module -Name PSWindowsUpdate -Force
+
+# Import the module
+Import-Module PSWindowsUpdate
+
+# Set the execution policy
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Check for and install updates
+Get-WindowsUpdate -Install -AcceptAll -IgnoreReboot
+
+# Check to see if apps are already installed and install them if they are not
+# Function to check if a command is available
+function CommandExists($command) {
+    Get-Command $command -ErrorAction SilentlyContinue
+}
+
+# Check if Scoop is installed
+if (-not (CommandExists 'scoop')) {
+    # Scoop is not installed, so install it
+    Write-Host "Scoop is not installed. Installing Scoop..."
+    
+    # Run the Scoop installation command with elevated privileges
+    iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
+
+    # Check if Scoop installation was successful
+    if (CommandExists 'scoop') {
+        Write-Host "Scoop installed successfully."
+    } else {
+        Write-Host "Failed to install Scoop. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # Scoop is already installed
+    Write-Host "Scoop is already installed. Skipping installation."
+}
+
+# Check if Chocolatey is installed
+if (-not (CommandExists 'choco')) {
+    # Chocolatey is not installed, so install it
+    Write-Host "Chocolatey is not installed. Installing Chocolatey..."
+    
+    # Run the Chocolatey installation command with elevated privileges
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+    # Check if Chocolatey installation was successful
+    if (CommandExists 'choco') {
+        Write-Host "Chocolatey installed successfully."
+    } else {
+        Write-Host "Failed to install Chocolatey. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # Chocolatey is already installed
+    Write-Host "Chocolatey is already installed. Skipping installation."
+}
+
+# Check if Git is installed
+if (-not (CommandExists 'git')) {
+    # Git is not installed, so install it using Chocolatey
+    Write-Host "Git is not installed. Installing Git..."
+    choco install git -y
+
+    # Check if Git installation was successful
+    if (CommandExists 'git') {
+        Write-Host "Git installed successfully."
+    } else {
+        Write-Host "Failed to install Git. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # Git is already installed
+    Write-Host "Git is already installed. Skipping installation."
+}
+
+# Check if Scoop Extras bucket is added
+if (-not (Test-Path "$env:USERPROFILE\scoop\buckets\extras")) {
+    # Scoop Extras bucket is not added, so add it
+    Write-Host "Scoop Extras bucket is not added. Adding Scoop Extras bucket..."
+    
+    # Run the Scoop command to add the Extras bucket
+    scoop bucket add extras
+
+    # Check if Scoop Extras bucket addition was successful
+    if (Test-Path "$env:USERPROFILE\scoop\buckets\extras") {
+        Write-Host "Scoop Extras bucket added successfully."
+    } else {
+        Write-Host "Failed to add Scoop Extras bucket. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # Scoop Extras bucket is already added
+    Write-Host "Scoop Extras bucket is already added. Skipping addition."
+}
+
+# Check if Nano for Windows is installed
+if (-not (CommandExists 'nano')) {
+    # Nano for Windows is not installed, so install it using Scoop
+    Write-Host "Nano for Windows is not installed. Installing Nano for Windows..."
+    scoop install nano
+
+    # Check if Nano for Windows installation was successful
+    if (CommandExists 'nano') {
+        Write-Host "Nano for Windows installed successfully."
+    } else {
+        Write-Host "Failed to install Nano for Windows. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # Nano for Windows is already installed
+    Write-Host "Nano for Windows is already installed. Skipping installation."
+}
+
+# Check if SteamCMD is installed
+if (-not (CommandExists 'steamcmd')) {
+    # SteamCMD is not installed, so install it using Scoop
+    Write-Host "SteamCMD is not installed. Installing SteamCMD..."
+    scoop install steam
+
+    # Check if SteamCMD installation was successful
+    if (CommandExists 'steamcmd') {
+        Write-Host "SteamCMD installed successfully."
+    } else {
+        Write-Host "Failed to install SteamCMD. Please check your internet connection and try again."
+        exit 1
+    }
+} else {
+    # SteamCMD is already installed
+    Write-Host "SteamCMD is already installed. Skipping installation."
+}
+
+# Install the OpenSSH Server (convenient for copying files)
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
 
 # Start the sshd service
@@ -64,18 +171,25 @@ if (!(Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyCon
     Write-Output "Firewall rule 'OpenSSH-Server-In-TCP' has been created and exists."
 }
 
-# Create the directory for the Enshrouded server to be installed to
-mkdir "c:\Enshrouded\"
+# Prompt the user for an install path
+$installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
+
+# Validate and ensure the path is not empty
+while (-not (Test-Path $installPath -PathType Container) -or -not $installPath) {
+    Write-Host "Invalid path. Please enter a valid installation path."
+    $installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
+}
+Write-Host "Success! Installing to $installPath"
 
 # Install Enshrouded dedicated server 
-steamcmd +force_install_dir c:\Enshrouded\ +login anonymous +app_update 2278520 validate +quit
+steamcmd +force_install_dir $installPath +login anonymous +app_update 2278520 validate +quit
 
 # Create the Enshrouded config file and write the contents of the file
 # Prompt the user for server name
-$serverName = Read-Host -Prompt "Enter the name you would like to use for your game server:"
+$serverName = Read-Host -Prompt "Enter the name you would like to use for your game server"
 
 # Prompt the user for server password
-$serverPassword = Read-Host -Prompt "Enter the password you would like to use for your game server:"
+$serverPassword = Read-Host -Prompt "Enter the password you would like to use for your game server"
 
 # Prompt the user for the game port with default value 15636
 $defaultGamePort = 15636
@@ -105,7 +219,7 @@ while ($queryPort -gt ($gamePort + 1)) {
 }
 
 # Prompt the user for the number of players allowed (with a maximum of 16)
-$maxPlayers = Read-Host -Prompt "Enter the maximum number of players (up to 16):"
+$maxPlayers = Read-Host -Prompt "Enter the maximum number of players (up to 16)"
 $maxPlayers = [math]::Min(16, [math]::Max(1, [int]$maxPlayers)) # Ensure the value is between 1 and 16
 
 # Define the JSON object
@@ -124,7 +238,7 @@ $jsonObject = @{
 $jsonString = $jsonObject | ConvertTo-Json
 
 # Set the file path
-$filePath = "C:\enshrouded\enshrouded_server.json"
+$filePath = "$installPath\enshrouded_server.json"
 
 # Save the JSON string to the file
 $jsonString | Set-Content -Path $filePath
@@ -150,7 +264,7 @@ CheckAndCreateFirewallRule $queryPort "UDP" "EnshroudedQueryPort"
 # Create a shortcut link to the Enshrouded server application in the home directory. This will allow you to run the server at logon by typing '.\enserver.lnk' 
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$Home\enserver.lnk")
-$Shortcut.TargetPath = "C:\enshrouded\enshrouded_server.exe"
+$Shortcut.TargetPath = "$installPath\enshrouded_server.exe"
 $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.

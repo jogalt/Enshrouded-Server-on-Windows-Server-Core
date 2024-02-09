@@ -6,4 +6,4 @@ While running a dedicated game server is best ran on a Linux server, not all gam
 Running a Windows Server Core OS can be difficult if you're not real great with Powershell.  So, this script fixes all that.  It will install everything you need, including Nano for Windows to modify your config file, to install and host your very own Enshrouded Dedicated Server.
 
 Enjoy!
-- TripodGG
+-TripodGG

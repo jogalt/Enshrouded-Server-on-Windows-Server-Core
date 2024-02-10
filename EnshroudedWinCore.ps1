@@ -1,7 +1,7 @@
 # Enshrouded Dedicated Server installation script for Windows Server Core
 # Written by TripodGG
 
-# Check the version of Windows Server and add the correct Windows desktop application compatibility files
+# Check the version of Windows Server to confirm it is a supported version
 $osVersion = (Get-CimInstance Win32_OperatingSystem).Version
 
 # Check if the OS is Windows Server 2016/2019
@@ -17,11 +17,59 @@ else {
 	exit
 }
 
+# Function for error logging
+function Log-Error {
+    param (
+        [string]$ErrorMessage
+    )
+
+    $LogPath = Join-Path $env:USERPROFILE -ChildPath "enshrouded\errorlog.txt"
+
+    try {
+        # Create the logs directory if it doesn't exist
+        $LogsDirectory = Join-Path $env:USERPROFILE -ChildPath "enshrouded"
+        if (-not (Test-Path $LogsDirectory -PathType Container)) {
+            New-Item -ItemType Directory -Path $LogsDirectory -Force | Out-Null
+        }
+
+        # Append the error message with timestamp to the log file
+        $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $LogMessage = "[$Timestamp] $ErrorMessage"
+        $LogMessage | Out-File -Append -FilePath $LogPath
+
+        # Inform the user about the error and the log location
+        Write-Host "An error occurred. Check the log file for details: $LogPath"
+    } catch {
+        Write-Host "Failed to log the error. Please check the log file manually: $LogPath"
+    }
+}
+
+# Function to check for an active Internet connection
+function Test-InternetConnection {
+    $pingResult = Test-Connection -ComputerName "www.google.com" -Count 1 -ErrorAction SilentlyContinue
+
+    if ($pingResult -eq $null) {
+        Log-Error "No active internet connection detected. Please ensure that you are connected to the internet before running this script."
+        exit 1
+    } else {
+        Write-Host "Internet connection detected. Proceeding with the script..."
+    }
+}
+
+# Call the function to check for an active internet connection
+Test-InternetConnection
+
 # Check if NuGet is installed
 if (-not (Get-Module -ListAvailable -Name NuGet)) {
-    # NuGet is not installed, so install it silently
-    Install-PackageProvider -Name NuGet -Force -ForceBootstrap -Scope CurrentUser -Confirm:$false
-    Install-Module -Name NuGet -Force -Scope CurrentUser -Confirm:$false
+    try {
+        # NuGet is not installed, so install it silently
+        Install-PackageProvider -Name NuGet -Force -ForceBootstrap -Scope CurrentUser -Confirm:$false
+        Install-Module -Name NuGet -Force -Scope CurrentUser -Confirm:$false
+    } catch {
+        $errorMessage = "Failed to install NuGet. Error: $_"
+        Log-Error $errorMessage
+        exit 1
+    }
 }
 
 # Make sure all Windows updates have been applied - This can also be done from sconfig under option 6
@@ -90,17 +138,24 @@ function CommandExists($command) {
 
 # Check if Scoop is installed
 if (-not (CommandExists 'scoop')) {
-    # Scoop is not installed, so install it
-    Write-Host "Scoop is not installed. Installing Scoop..."
-    
-    # Run the Scoop installation command with elevated privileges
-    iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
+    try {
+        # Scoop is not installed, so install it
+        Write-Host "Scoop is not installed. Installing Scoop..."
+        
+        # Run the Scoop installation command with elevated privileges
+        iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
 
-    # Check if Scoop installation was successful
-    if (CommandExists 'scoop') {
-        Write-Host "Scoop installed successfully."
-    } else {
-        Write-Host "Failed to install Scoop. Please check your internet connection and try again."
+        # Check if Scoop installation was successful
+        if (CommandExists 'scoop') {
+            Write-Host "Scoop installed successfully."
+        } else {
+            $errorMessage = "Failed to install Scoop. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during Scoop installation. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -110,17 +165,24 @@ if (-not (CommandExists 'scoop')) {
 
 # Check if Chocolatey is installed
 if (-not (CommandExists 'choco')) {
-    # Chocolatey is not installed, so install it
-    Write-Host "Chocolatey is not installed. Installing Chocolatey..."
-    
-    # Run the Chocolatey installation command with elevated privileges
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    try {
+        # Chocolatey is not installed, so install it
+        Write-Host "Chocolatey is not installed. Installing Chocolatey..."
+        
+        # Run the Chocolatey installation command with elevated privileges
+        Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
-    # Check if Chocolatey installation was successful
-    if (CommandExists 'choco') {
-        Write-Host "Chocolatey installed successfully."
-    } else {
-        Write-Host "Failed to install Chocolatey. Please check your internet connection and try again."
+        # Check if Chocolatey installation was successful
+        if (CommandExists 'choco') {
+            Write-Host "Chocolatey installed successfully."
+        } else {
+            $errorMessage = "Failed to install Chocolatey. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during Chocolatey installation. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -130,15 +192,22 @@ if (-not (CommandExists 'choco')) {
 
 # Check if Git is installed
 if (-not (CommandExists 'git')) {
-    # Git is not installed, so install it using Chocolatey
-    Write-Host "Git is not installed. Installing Git..."
-    scoop install git
+    try {
+        # Git is not installed, so install it using Chocolatey
+        Write-Host "Git is not installed. Installing Git..."
+        scoop install git
 
-    # Check if Git installation was successful
-    if (CommandExists 'git') {
-        Write-Host "Git installed successfully."
-    } else {
-        Write-Host "Failed to install Git. Please check your internet connection and try again."
+        # Check if Git installation was successful
+        if (CommandExists 'git') {
+            Write-Host "Git installed successfully."
+        } else {
+            $errorMessage = "Failed to install Git. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during Git installation. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -148,17 +217,24 @@ if (-not (CommandExists 'git')) {
 
 # Check if Scoop Extras bucket is added
 if (-not (Test-Path "$env:USERPROFILE\scoop\buckets\extras")) {
-    # Scoop Extras bucket is not added, so add it
-    Write-Host "Scoop Extras bucket is not added. Adding Scoop Extras bucket..."
-    
-    # Run the Scoop command to add the Extras bucket
-    scoop bucket add extras
+    try {
+        # Scoop Extras bucket is not added, so add it
+        Write-Host "Scoop Extras bucket is not added. Adding Scoop Extras bucket..."
+        
+        # Run the Scoop command to add the Extras bucket
+        scoop bucket add extras
 
-    # Check if Scoop Extras bucket addition was successful
-    if (Test-Path "$env:USERPROFILE\scoop\buckets\extras") {
-        Write-Host "Scoop Extras bucket added successfully."
-    } else {
-        Write-Host "Failed to add Scoop Extras bucket. Please check your internet connection and try again."
+        # Check if Scoop Extras bucket addition was successful
+        if (Test-Path "$env:USERPROFILE\scoop\buckets\extras") {
+            Write-Host "Scoop Extras bucket added successfully."
+        } else {
+            $errorMessage = "Failed to add Scoop Extras bucket. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during Scoop Extras bucket addition. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -168,15 +244,22 @@ if (-not (Test-Path "$env:USERPROFILE\scoop\buckets\extras")) {
 
 # Check if Nano for Windows is installed
 if (-not (CommandExists 'nano')) {
-    # Nano for Windows is not installed, so install it using Scoop
-    Write-Host "Nano for Windows is not installed. Installing Nano for Windows..."
-    scoop install nano
+    try {
+        # Nano for Windows is not installed, so install it using Scoop
+        Write-Host "Nano for Windows is not installed. Installing Nano for Windows..."
+        scoop install nano
 
-    # Check if Nano for Windows installation was successful
-    if (CommandExists 'nano') {
-        Write-Host "Nano for Windows installed successfully."
-    } else {
-        Write-Host "Failed to install Nano for Windows. Please check your internet connection and try again."
+        # Check if Nano for Windows installation was successful
+        if (CommandExists 'nano') {
+            Write-Host "Nano for Windows installed successfully."
+        } else {
+            $errorMessage = "Failed to install Nano for Windows. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during Nano for Windows installation. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -186,15 +269,22 @@ if (-not (CommandExists 'nano')) {
 
 # Check if SteamCMD is installed
 if (-not (CommandExists 'steamcmd')) {
-    # SteamCMD is not installed, so install it using Scoop
-    Write-Host "SteamCMD is not installed. Installing SteamCMD..."
-    scoop install steamcmd
+    try {
+        # SteamCMD is not installed, so install it using Scoop
+        Write-Host "SteamCMD is not installed. Installing SteamCMD..."
+        scoop install steamcmd
 
-    # Check if SteamCMD installation was successful
-    if (CommandExists 'steamcmd') {
-        Write-Host "SteamCMD installed successfully."
-    } else {
-        Write-Host "Failed to install SteamCMD. Please check your internet connection and try again."
+        # Check if SteamCMD installation was successful
+        if (CommandExists 'steamcmd') {
+            Write-Host "SteamCMD installed successfully."
+        } else {
+            $errorMessage = "Failed to install SteamCMD. Please check your internet connection and try again."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during SteamCMD installation. Error: $_"
+        Log-Error $errorMessage
         exit 1
     }
 } else {
@@ -202,49 +292,121 @@ if (-not (CommandExists 'steamcmd')) {
     Write-Host "SteamCMD is already installed. Skipping installation."
 }
 
-# Function to prompt user for install path
-function PromptForInstallPath {
-    $installPath = Read-Host -Prompt "Enter the directory where you would like to install the dedicated server"
+# Function to check if Visual C++ Redistributable 2022 is installed
+function Check-VCRedist2022Installed {
+    $redistVersion = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64' -ErrorAction SilentlyContinue
 
-    # Validate and ensure the path is not empty
-    while (-not $installPath -or -not (Test-Path $installPath -IsValid)) {
-        Write-Host "Invalid directory or directory does not exist."
-        $createPathChoice = Read-Host -Prompt "Do you want to create the directory? (Y/N)"
-        
-        if ($createPathChoice -eq 'Y' -or $createPathChoice -eq 'y') {
-            # Attempt to create the path
-            try {
-                New-Item -Path $installPath -ItemType Directory -Force
-                Write-Host "Directory created successfully."
-            } catch {
-                Write-Host "Error creating path. Please enter a valid installation path."
-                $installPath = Read-Host -Prompt "Enter the path where you would like to install the dedicated server"
-            }
-        } else {
-            # User does not want to create the path, prompt again for install path
-            $installPath = Read-Host -Prompt "Enter the directory where you would like to install the dedicated server"
-        }
+    if ($redistVersion -eq $null) {
+        return $false
+    } else {
+        return $true
     }
-
-    return $installPath
 }
 
-# Prompt user for install path
-$chosenPath = PromptForInstallPath
+# Function to install Visual C++ Redistributable 2022
+function Install-VCRedist2022 {
+    try {
+        Write-Host "Installing Visual C++ Redistributable 2022..."
+        
+        # Add the download link for Visual C++ Redistributable 2022
+        $downloadLink = "https://aka.ms/vs/17/release/VC_redist.x64.exe"
+        
+        # Define the path to save the installer
+        $installerPath = Join-Path $env:TEMP "VC_redist.x64.exe"
+        
+        # Download the installer
+        Invoke-WebRequest -Uri $downloadLink -OutFile $installerPath
+        
+        # Install Visual C++ Redistributable 2022 silently
+        Start-Process -FilePath $installerPath -ArgumentList "/quiet", "/install" -Wait
+        
+        Write-Host "Visual C++ Redistributable 2022 has been installed."
+        
+        # Clean up the temporary installer file
+        Remove-Item -Path $installerPath -Force
+    } catch {
+        $errorMessage = "An unexpected error occurred during Visual C++ Redistributable 2022 installation. Error: $_"
+        Log-Error $errorMessage
+        exit 1
+    }
+}
 
-# Use the $chosenPath variable later in your script
-Write-Host "Success! Installing to $chosenPath"
+# Check if Visual C++ Redistributable 2022 is installed
+$vcRedistInstalled = Check-VCRedist2022Installed
 
-# Continue with your script...
+if (-not $vcRedistInstalled) {
+    # Install Visual C++ Redistributable 2022 if not installed
+    Install-VCRedist2022
+} else {
+    Write-Host "Visual C++ Redistributable 2022 is already installed."
+}
 
+# Function to prompt user for install path
+function Get-ValidDirectory {
+    $attempts = 0
+
+    do {
+        # Prompt user for the installation directory
+        $installPath = Read-Host "Enter the directory where you would like to install the dedicated server. Press Enter for default (C:\EnshroudedServer\)"
+
+        # Check if user input is empty and set default directory
+        if (-not $installPath) {
+            $installPath = "C:\EnshroudedServer\"
+        }
+
+        # Check if the path is valid
+        if (Test-Path $installPath -IsValid) {
+            # Check if the path is a container (directory)
+            if (-not (Test-Path $installPath -PathType Container)) {
+                # Prompt user to create the directory
+                $createDirectory = Read-Host "The directory does not exist. Would you like to create it? (Yes/No)"
+                if ($createDirectory -eq 'Yes') {
+                    try {
+                        # Attempt to create the directory
+                        New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+                        Write-Host "Directory created successfully at $installPath"
+                    } catch {
+                        # Handle unexpected error during directory creation
+                        $errorMessage = "An unexpected error occurred while creating the installation directory. Error: $_"
+                        Log-Error $errorMessage
+                        exit 1
+                    }
+                } else {
+                    # User chose not to create the directory
+                    Write-Host "Installation directory not created. Please choose a valid directory."
+                    continue
+                }
+            }
+            # Return the validated installation path
+            return $installPath
+        } else {
+            # Invalid path entered by the user
+            Write-Host "Invalid path. Please enter a valid directory path."
+        }
+
+        # Increment attempts and exit if reached the limit
+        $attempts++
+        if ($attempts -eq 3) {
+            Write-Host "Failed after 3 attempts. Exiting script."
+            exit 1
+        }
+    } while ($true)
+}
+
+# Success message
+try {
+    # Call the Get-ValidDirectory function
+    $installDirectory = Get-ValidDirectory
+    Write-Host "Success! The dedicated server will be installed to: $installDirectory"
+} catch {
+    # Handle unexpected error during the installation directory prompt
+    $errorMessage = "An unexpected error occurred during the installation directory prompt. Error: $_"
+    Log-Error $errorMessage
+    exit 1
+}
 
 # Install Enshrouded dedicated server 
-steamcmd +force_install_dir $chosenPath +login anonymous +app_update 2278520 validate +quit
-
-# Install Visual C++ 2022 Redistributable
-cd $chosenPath\_CommonRedist\vcredist\2022\
-vc_redist.x64.exe
-cd ~
+steamcmd +force_install_dir $installDirectory +login anonymous +app_update 2278520 validate +quit
 
 # Create the Enshrouded config file and write the contents of the file
 # Prompt the user for server name
@@ -300,7 +462,7 @@ $jsonObject = @{
 $jsonString = $jsonObject | ConvertTo-Json
 
 # Set the file path
-$filePath = "$chosenPath\enshrouded_server.json"
+$filePath = "$installDirectory\enshrouded_server.json"
 
 # Save the JSON string to the file
 $jsonString | Set-Content -Path $filePath
@@ -326,7 +488,7 @@ CheckAndCreateFirewallRule $queryPort "UDP" "EnshroudedQueryPort"
 # Create a shortcut link to the Enshrouded server application in the home directory. This will allow you to run the server at logon by typing '.\enserver.lnk' 
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$Home\enserver.lnk")
-$Shortcut.TargetPath = "$chosenPath\enshrouded_server.exe"
+$Shortcut.TargetPath = "$installDirectory\enshrouded_server.exe"
 $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.

@@ -303,43 +303,33 @@ function Check-VCRedist2022Installed {
     }
 }
 
-# Function to install Visual C++ Redistributable 2022
-function Install-VCRedist2022 {
+# Function to check if Visual C++ Redistributable is installed
+function Check-VCRedist {
+    $vcRedistInstalled = Get-WmiObject -Query "SELECT * FROM Win32_Product WHERE Name LIKE 'Microsoft Visual C++ % Redistributable%'" -ErrorAction SilentlyContinue
+
+    if ($vcRedistInstalled) {
+        Write-Host "Visual C++ Redistributable is already installed."
+    } else {
+        Install-VCRedist
+    }
+}
+
+# Function to install Visual C++ Redistributable using Chocolatey
+function Install-VCRedist {
     try {
-        Write-Host "Installing Visual C++ Redistributable 2022..."
-        
-        # Add the download link for Visual C++ Redistributable 2022
-        $downloadLink = "https://aka.ms/vs/17/release/VC_redist.x64.exe"
-        
-        # Define the path to save the installer
-        $installerPath = Join-Path $env:TEMP "VC_redist.x64.exe"
-        
-        # Download the installer
-        Invoke-WebRequest -Uri $downloadLink -OutFile $installerPath
-        
-        # Install Visual C++ Redistributable 2022 silently
-        Start-Process -FilePath $installerPath -ArgumentList "/quiet", "/install" -Wait
-        
-        Write-Host "Visual C++ Redistributable 2022 has been installed."
-        
-        # Clean up the temporary installer file
-        Remove-Item -Path $installerPath -Force
+        Write-Host "Installing Visual C++ Redistributable using Chocolatey..."
+        choco install vcredist-all -y
+        Write-Host "Visual C++ Redistributable installed successfully."
     } catch {
-        $errorMessage = "An unexpected error occurred during Visual C++ Redistributable 2022 installation. Error: $_"
+        # Handle unexpected error during installation
+        $errorMessage = "An unexpected error occurred while installing Visual C++ Redistributable. Error: $_"
         Log-Error $errorMessage
         exit 1
     }
 }
 
-# Check if Visual C++ Redistributable 2022 is installed
-$vcRedistInstalled = Check-VCRedist2022Installed
-
-if (-not $vcRedistInstalled) {
-    # Install Visual C++ Redistributable 2022 if not installed
-    Install-VCRedist2022
-} else {
-    Write-Host "Visual C++ Redistributable 2022 is already installed."
-}
+# Check if Visual C++ Redistributable is installed
+Check-VCRedist
 
 # Function to prompt user for install path
 function Get-ValidDirectory {
@@ -347,20 +337,15 @@ function Get-ValidDirectory {
 
     do {
         # Prompt user for the installation directory
-        $installPath = Read-Host "Enter the directory where you would like to install the dedicated server. Press Enter for default (C:\EnshroudedServer\)"
-
-        # Check if user input is empty and set default directory
-        if (-not $installPath) {
-            $installPath = "C:\EnshroudedServer\"
-        }
+        $installPath = Read-Host "Enter the directory where you would like to install the dedicated server. (i.e. 'C:\EnshroudedServer')"
 
         # Check if the path is valid
         if (Test-Path $installPath -IsValid) {
             # Check if the path is a container (directory)
             if (-not (Test-Path $installPath -PathType Container)) {
                 # Prompt user to create the directory
-                $createDirectory = Read-Host "The directory does not exist. Would you like to create it? (Yes/No)"
-                if ($createDirectory -eq 'Yes') {
+                $createDirectory = Read-Host "The directory does not exist. Would you like to create it? (yes/no)"
+                if ($createDirectory -eq 'y' -or $createDirectory -eq 'yes') {
                     try {
                         # Attempt to create the directory
                         New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -371,9 +356,13 @@ function Get-ValidDirectory {
                         Log-Error $errorMessage
                         exit 1
                     }
-                } else {
+                } elseif ($createDirectory -eq 'n' -or $createDirectory -eq 'no') {
                     # User chose not to create the directory
                     Write-Host "Installation directory not created. Please choose a valid directory."
+                    continue
+                } else {
+                    # Invalid input for createDirectory
+                    Write-Host "Invalid input. Please enter 'yes' or 'no'."
                     continue
                 }
             }
@@ -397,7 +386,7 @@ function Get-ValidDirectory {
 try {
     # Call the Get-ValidDirectory function
     $installDirectory = Get-ValidDirectory
-    Write-Host "Success! The dedicated server will be installed to: $installDirectory"
+    Write-Host "Success! The dedicated server will be installed to $installDirectory"
 } catch {
     # Handle unexpected error during the installation directory prompt
     $errorMessage = "An unexpected error occurred during the installation directory prompt. Error: $_"

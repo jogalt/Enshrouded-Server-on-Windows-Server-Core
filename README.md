@@ -5,8 +5,8 @@ While running a dedicated game server is best ran on a Linux server, not all gam
 
 Running a Windows Server Core OS can be difficult if you're not real great with Powershell, but is definitely the best way to run a Windows server in this setting.  So, this script fixes all that.  No more will you need to spend hours (or even days) looking up Powershell commands and play the guessing game on if something will work the way you want it to.  It will install everything you need to install and host your very own Enshrouded Dedicated Server.
 
-It is recommended that you fully update your Windows Server Core OS prior to running the script to ensure proper functionality of the script, but the script will check and apply all Windows updates before doing anything else.  You will be prompted to enter where you want to install the server, the name you want to use for your server, the password you want to use, and the port numbers you want to use (if you dont want to use the defaults).  Enter in this information and everything will be set for you.
+It is highly recommended that you fully update your Windows Server Core OS prior to running the script to ensure proper functionality of the script, but the script will check and apply all Windows updates before doing anything else.  If you are not familiar with Windows Server Core, Option 6 from SConfig will open the Windows Update menu, and Option 1 from the Windows Update menu will check for all updates.  During the script's install process, you will be prompted to enter where you want to install the server, the name you want to use for your server, the password you want to use, and the port numbers you want to use (if you dont want to use the defaults).  Enter in this information and the server's config file will be created for you.  Be sure to use Port Forwarding to open these ports on your router and send connections to the server's IP address.
 
-This is a great game, and so I hope this helps everyone get their own server up and running.  Enjoy!
+This is a great game!  I hope this helps everyone get their own server up and running.  Enjoy!
 
 -TripodGG

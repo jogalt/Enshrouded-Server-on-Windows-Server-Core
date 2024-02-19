@@ -130,6 +130,10 @@ else {
     Write-Host "Continuing with installation..."
 }
 
+# Install DirectX Configuration Database
+Write-Host "Installing DirectX Configuration Database."
+Add-WindowsCapability -Online -Name DirectX.Configuration.Database~~~~0.0.1.0
+
 # Check to see if apps are already installed and install them if they are not
 # Function to check if a command is available
 function CommandExists($command) {
@@ -459,9 +463,28 @@ $jsonString | Set-Content -Path $filePath
 Write-Host "Configuration saved to $filePath"
 
 # Copy the required DirectX dll to the install directory
-cd C:\Windows\SysWOW64
-cp dinput8.dll $installDirectory\dinput8.dll
-cd ~
+# Get all drives on the computer
+$drives = Get-PSDrive -PSProvider FileSystem
+
+# Iterate through each drive and search for dinput8.dll
+foreach ($drive in $drives) {
+    $searchPath = Join-Path -Path $drive.Root -ChildPath "dinput8.dll"
+
+    # Check if the file exists in the current drive
+    if (Test-Path $searchPath -PathType Leaf) {
+        # File found, copy it to the installation directory
+        $destinationPath = Join-Path -Path $installDirectory -ChildPath "dinput8.dll"
+        Copy-Item -Path $searchPath -Destination $destinationPath -Force
+
+        Write-Host "Required DirectX files copied to $destinationPath"
+        break  # Stop searching once the file is found and copied
+    }
+}
+
+# Check if the file was not found
+if (-not (Test-Path $destinationPath -PathType Leaf)) {
+    Write-Host "Required DirectX files not found on the computer."
+}
 
 # Function to check and create firewall rules
 function CheckAndCreateFirewallRule($port, $protocol, $ruleName) {

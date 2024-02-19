@@ -458,8 +458,8 @@ $jsonString | Set-Content -Path $filePath
 
 Write-Host "Configuration saved to $filePath"
 
-# Copy the DirectX dll to the install directory
-cd %systemroot%\SysWOW64\
+# Copy the required DirectX dll to the install directory
+cd C:\Windows\SysWOW64
 cp dinput8.dll $installDirectory\dinput8.dll
 cd ~
 

@@ -459,7 +459,9 @@ $jsonString | Set-Content -Path $filePath
 Write-Host "Configuration saved to $filePath"
 
 # Copy the DirectX dll to the install directory
-cp %systemroot%\SysWOW64\dinput8.dll $installDirectory\dinput8.dll
+cd %systemroot%\SysWOW64\
+cp dinput8.dll $installDirectory\dinput8.dll
+cd ~
 
 # Function to check and create firewall rules
 function CheckAndCreateFirewallRule($port, $protocol, $ruleName) {

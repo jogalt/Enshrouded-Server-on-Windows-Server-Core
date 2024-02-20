@@ -480,11 +480,6 @@ $jsonString | Set-Content -Path $filePath
 
 Write-Host "Configuration saved to $filePath"
 
-# Copy required DirectX files to the install directory
-cd c:\windows\syswow64
-cp dinput8.dll $installDirectory\dinput8.dll
-cd ~
-
 # Function to check and create firewall rules
 function CheckAndCreateFirewallRule($port, $protocol, $ruleName) {
     $existingRule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
@@ -509,3 +504,14 @@ $Shortcut.Save()
 
 # Echo the completion of the script and provide the command to start the server app.
 Write-Output "Enshrouded dedicated server has successfully been installed. Use '.\enserver.lnk' to start the game server app."
+
+# Prompt the user to reboot the server
+$userChoice = Read-Host -Prompt "A reboot is required for changes to take effect. The Enshrouded server will not run until a reboot is completed. Do you want to reboot now? (Y/N)"
+
+if ($userChoice -eq 'Y' -or $userChoice -eq 'Yes') {
+    Write-Host "Rebooting the server..."
+    # Invoke the restart command
+    Restart-Computer -Force
+} else {
+    Write-Host "The Enshrouded server will not run until a reboot is completed. Please reboot at your earliest convenience."
+}

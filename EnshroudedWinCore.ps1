@@ -82,7 +82,25 @@ Import-Module PSWindowsUpdate
 # Set the execution policy
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# Check for and install updates
+# Check for and install KB5009608 (required to run  Windows desktop application compatibility)
+$kbNumber = 'KB5009608'
+$installedUpdate = Get-HotFix | Where-Object {$_.HotFixID -eq $kbNumber}
+
+if ($installedUpdate) {
+    Write-Host "$kbNumber is already installed on this system."
+} else {
+    # Prompt the user to install KB5009608
+    $userChoice = Read-Host -Prompt "$kbNumber is required to run this game server. Do you want to install $kbNumber? (Y/N)"
+
+    if ($userChoice -eq 'Y' -or $userChoice -eq 'Yes') {
+        Get-WindowsUpdate -KBArticleID $kbNumber -Install -AcceptAll
+        Write-Host "Installing $kbNumber..."
+    } else {
+        Write-Host "Installation of $kbNumber canceled."
+    }
+}
+
+# Check for and install any additional updates
 Get-WindowsUpdate -Install -AcceptAll
 
 # Function to check if a reboot is pending due to updates
@@ -462,29 +480,10 @@ $jsonString | Set-Content -Path $filePath
 
 Write-Host "Configuration saved to $filePath"
 
-# Copy the required DirectX dll to the install directory
-# Get all drives on the computer
-$drives = Get-PSDrive -PSProvider FileSystem
-
-# Iterate through each drive and search for dinput8.dll
-foreach ($drive in $drives) {
-    $searchPath = Join-Path -Path $drive.Root -ChildPath "dinput8.dll"
-
-    # Check if the file exists in the current drive
-    if (Test-Path $searchPath -PathType Leaf) {
-        # File found, copy it to the installation directory
-        $destinationPath = Join-Path -Path $installDirectory -ChildPath "dinput8.dll"
-        Copy-Item -Path $searchPath -Destination $destinationPath -Force
-
-        Write-Host "Required DirectX files copied to $destinationPath"
-        break  # Stop searching once the file is found and copied
-    }
-}
-
-# Check if the file was not found
-if (-not (Test-Path $destinationPath -PathType Leaf)) {
-    Write-Host "Required DirectX files not found on the computer."
-}
+# Copy required DirectX files to the install directory
+cd c:\windows\syswow64
+cp dinput8.dll $installDirectory\dinput8.dll
+cd ~
 
 # Function to check and create firewall rules
 function CheckAndCreateFirewallRule($port, $protocol, $ruleName) {

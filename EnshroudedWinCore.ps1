@@ -289,6 +289,31 @@ if (-not (CommandExists 'nano')) {
     Write-Host "Nano for Windows is already installed. Skipping installation."
 }
 
+# Check if NSSM is installed
+if (-not (Get-Command nssm -ErrorAction SilentlyContinue)) {
+    try {
+        # NSSM is not installed, so install it using Chocolatey
+        Write-Host "NSSM is not installed. Installing NSSM..."
+        choco install nssm -y
+
+        # Check if NSSM installation was successful
+        if (Get-Command nssm -ErrorAction SilentlyContinue) {
+            Write-Host "NSSM installed successfully."
+        } else {
+            $errorMessage = "Failed to install NSSM. Please check the Chocolatey logs for more information."
+            Log-Error $errorMessage
+            exit 1
+        }
+    } catch {
+        $errorMessage = "An unexpected error occurred during NSSM installation. Error: $_"
+        Log-Error $errorMessage
+        exit 1
+    }
+} else {
+    # NSSM is already installed
+    Write-Host "NSSM is already installed. Skipping installation."
+}
+
 # Check if SteamCMD is installed
 if (-not (CommandExists 'steamcmd')) {
     try {
@@ -501,6 +526,102 @@ $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$Home\enserver.lnk")
 $Shortcut.TargetPath = "$installDirectory\enshrouded_server.exe"
 $Shortcut.Save()
+
+# Function to create a scheduled backup
+function Create-ServerBackupScheduledTask {
+    param (
+        [string]$installDirectory,
+        [string]$defaultBackupDirectory
+    )
+
+    # Prompt for backup directory location
+    do {
+        $backupDirectory = Read-Host "Enter the location for the backup directory (default: $defaultBackupDirectory)"
+        if (-not $backupDirectory) {
+            $backupDirectory = $defaultBackupDirectory
+        }
+
+        # Check if the directory exists
+        if (Test-Path $backupDirectory) {
+            $createNewDirectory = $null
+            # Directory exists, ask for confirmation to use it
+            while ($createNewDirectory -notin @('Y', 'N')) {
+                $createNewDirectory = Read-Host "The directory '$backupDirectory' already exists. Do you want to use it? (Y/N)"
+            }
+            if ($createNewDirectory -eq 'N') {
+                continue
+            }
+        } else {
+            $createNewDirectory = $null
+            # Directory doesn't exist, ask for confirmation to create it
+            while ($createNewDirectory -notin @('Y', 'N')) {
+                $createNewDirectory = Read-Host "The directory '$backupDirectory' does not exist. Do you want to create it? (Y/N)"
+            }
+            if ($createNewDirectory -eq 'Y') {
+                New-Item -ItemType Directory -Path $backupDirectory | Out-Null
+            } else {
+                continue
+            }
+        }
+    } while (-not (Test-Path $backupDirectory))
+
+    # Ensure $backupDirectory is not inside $installDirectory
+    if ($backupDirectory -like "$installDirectory*") {
+        Write-Host "Error: Backup directory cannot be inside the install directory."
+        return
+    }
+
+    # Prompt for task frequency
+    $taskFrequency = Read-Host "How often should the backup run? (Daily, Weekly, Bi-weekly, Monthly)"
+
+    # Prompt for task execution time
+    $taskExecutionTime = $null
+    while (-not $taskExecutionTime) {
+        $taskExecutionTime = Read-Host "What time should the backup run? (24-hour format, e.g., 14:30)"
+    }
+
+    # Create scheduled task with repetition to run indefinitely
+    $taskAction = New-ScheduledTaskAction -Execute "robocopy" -Argument "$installDirectory $backupDirectory /MIR /R:0 /W:0 /NFL /NDL /NP"
+
+    # Create a string representing the repetition interval
+    $repetitionInterval = 'P99999DT23H59M59S'
+
+    # Create a string representing the repetition duration
+    $repetitionDuration = 'P99999DT23H59M59S'
+
+    # Create the scheduled task using schtasks.exe
+    schtasks.exe /Create /TN "Server Backup - $(Get-Date -Format 'yyyyMMddHHmmss')" /TR "robocopy '$installDirectory' '$backupDirectory' /MIR /R:0 /W:0 /NFL /NDL /NP" /SC ONCE /ST $taskExecutionTime /RI $repetitionInterval /DU $repetitionDuration /F
+
+    Write-Host "Scheduled task created successfully."
+}
+
+# Create the scheduled task
+$defaultBackupDirectory = "C:\EnshroudedBackups"
+Create-ServerBackupScheduledTask -installDirectory $installDirectory -defaultBackupDirectory $defaultBackupDirectory
+
+# Create a new service to auto-start the Enshrouded server
+# Define the executable path
+$executablePath = Join-Path $installDirectory "enshrouded_server.exe"
+
+# Define the service name
+$serviceName = "EnshroudedServer"
+
+# Use NSSM to create a new service
+$arguments = @(
+    "install", $serviceName, $executablePath,
+    "-DelayedAutoStart", # Enable delayed startup
+    "-DisplayName", "Enshrouded Server", # Display name for the service
+    "-Description", "Service for the Enshrouded Server application" # Description for the service
+)
+
+try {
+    Start-Process "nssm.exe" -ArgumentList $arguments -Wait -NoNewWindow
+    Write-Host "Service 'Enshrouded Server' created successfully."
+} catch {
+    $errorMessage = "An error occurred while creating the service. Error: $_"
+    Log-Error $errorMessage
+    exit 1
+}
 
 # Echo the completion of the script and provide the command to start the server app.
 Write-Output "Enshrouded dedicated server has successfully been installed. Use '.\enserver.lnk' to start the game server app."

@@ -12,6 +12,10 @@ if ($osVersion -match '10\.0\.(14393|17763)') {
 elseif ($osVersion -match '10\.0\.(20348)') {
     Write-Host "Windows Server 2022 detected."
 }
+# Check if the OS Windows Server 2023
+elseif ($osVersion -match '10\.0\.(25398)') {
+    Write-Host "Windows Server 2023 detected."
+}
 else {
     Write-Host "Unsupported Windows Server version. Please use a supported version of Windows Server."
 	exit
